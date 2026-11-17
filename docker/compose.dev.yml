@@ -1,0 +1,22 @@
+name: commerce-lab-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: commercelab
+      POSTGRES_PASSWORD: ${COMMERCE_DB_PASSWORD:?Set COMMERCE_DB_PASSWORD in docker/.env}
+      POSTGRES_DB: commercelab_dev
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - commerce_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commercelab -d commercelab_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  commerce_pg_data:
