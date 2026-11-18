@@ -1,57 +1,153 @@
 openapi: 3.1.0
 info:
   title: CommerceLab API
-  version: 0.1.0
-  description: Initial CommerceLab API contract. Authentication, catalog, carts and orders will be added in later milestones.
+  version: 0.2.0
+  description: Cookie-based authentication. Obtain a CSRF token before every state-changing request.
 servers:
   - url: http://localhost:3000/api/v1
 paths:
   /health:
     get:
-      summary: Legacy-compatible liveness check
-      operationId: getHealth
       tags: [Health]
       responses:
         '200':
           description: Application is running
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
   /health/live:
     get:
-      summary: Liveness check
-      operationId: getLiveness
       tags: [Health]
       responses:
         '200':
-          description: Process is running
+          description: Process liveness
   /health/ready:
     get:
-      summary: Database readiness check
-      operationId: getReadiness
       tags: [Health]
       responses:
         '200':
-          description: Database is available
+          description: Database connected
         '503':
-          description: Database is unavailable
+          description: Database unavailable
+  /auth/csrf:
+    get:
+      tags: [Authentication]
+      summary: Issue a signed CSRF token and readable CSRF cookie
+      responses:
+        '200':
+          description: Returns data.csrfToken
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a customer and issue session cookies
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201':
+          description: Customer created
+        '400':
+          description: Invalid input
+        '403':
+          description: Invalid CSRF token
+        '409':
+          description: Email already registered
+        '429':
+          description: Too many attempts
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate with email and password
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: Authenticated
+        '401':
+          description: Invalid credentials
+        '403':
+          description: Invalid CSRF token
+        '429':
+          description: Too many attempts
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Rotate refresh token and issue new access cookie
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Tokens refreshed
+        '401':
+          description: Invalid, expired or revoked session
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke current refresh session
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Cookies cleared and session revoked if present
+  /auth/logout-all:
+    post:
+      tags: [Authentication]
+      summary: Revoke all sessions of authenticated user
+      security:
+        - accessCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: All sessions revoked
+        '401':
+          description: Authentication required
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Retrieve authenticated user
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Current user, excluding password hash
+        '401':
+          description: Authentication required
 components:
+  parameters:
+    CsrfHeader:
+      name: x-csrf-token
+      in: header
+      required: true
+      description: Value returned by GET /auth/csrf, paired with cl_csrf cookie
+      schema:
+        type: string
+  securitySchemes:
+    accessCookie:
+      type: apiKey
+      in: cookie
+      name: cl_access
   schemas:
-    HealthResponse:
+    RegisterInput:
       type: object
-      required: [success, data]
+      additionalProperties: false
+      required: [name, email, password]
       properties:
-        success:
-          type: boolean
-          const: true
-        data:
-          type: object
-          required: [status, service]
-          properties:
-            status:
-              type: string
-              const: ok
-            service:
-              type: string
-              const: commerce-lab-api
+        name: { type: string, minLength: 2, maxLength: 120 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 12, maxLength: 128 }
+    LoginInput:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }

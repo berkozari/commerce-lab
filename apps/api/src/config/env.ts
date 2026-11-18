@@ -8,18 +8,24 @@ const envSchema = z.object({
     DATABASE_URL: z.string().url().optional(),
     CORS_ORIGIN: z.string().url().default("http://localhost:5173"),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+    AUTH_JWT_SECRET: z.string().min(32).refine((value) => !value.startsWith("REPLACE_"), "Secret must be replaced").optional(),
+    AUTH_CSRF_SECRET: z.string().min(32).refine((value) => !value.startsWith("REPLACE_"), "Secret must be replaced").optional(),
 });
 
 const result = envSchema.safeParse(process.env);
 if (!result.success) {
-    // Do not print values of secret environment variables.
     throw new Error(`Invalid environment configuration: ${result.error.issues.map((issue) => issue.path.join(".")).join(", ")}`);
 }
 export const env = result.data;
 
 export function requireDatabaseUrl(): string {
-    if (!env.DATABASE_URL) {
-        throw new Error("DATABASE_URL must be configured for database operations");
-    }
+    if (!env.DATABASE_URL) throw new Error("DATABASE_URL must be configured for database operations");
     return env.DATABASE_URL;
+}
+
+export function requireAuthSecrets(): { jwtSecret: string; csrfSecret: string } {
+    if (!env.AUTH_JWT_SECRET || !env.AUTH_CSRF_SECRET) {
+        throw new Error("AUTH_JWT_SECRET and AUTH_CSRF_SECRET must each be at least 32 characters");
+    }
+    return { jwtSecret: env.AUTH_JWT_SECRET, csrfSecret: env.AUTH_CSRF_SECRET };
 }
