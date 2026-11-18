@@ -1,10 +1,11 @@
 import { app } from "./app.js";
-import { env, requireDatabaseUrl } from "./config/env.js";
+import { env, requireDatabaseUrl, requireAuthSecrets } from "./config/env.js";
 import { disconnectDatabase } from "./config/database.js";
 import { logger } from "./lib/logger.js";
 
 // Fail fast on missing DB configuration in actual server startup, not during app-only unit tests.
 requireDatabaseUrl();
+requireAuthSecrets();
 const server = app.listen(env.PORT, env.HOST, () => {
     logger.info({ port: env.PORT, host: env.HOST }, "CommerceLab API listening");
 });
