@@ -322,6 +322,78 @@ paths:
             schema: { type: object, required: [quantity], properties: { quantity: { type: integer, minimum: 0 } } }
       responses:
         '200': { description: Inventory updated }
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Get or initialize the authenticated user or guest cart
+      responses:
+        '200': { description: Cart snapshot with decimal string totals }
+        '401': { description: Invalid access session }
+    delete:
+      tags: [Cart]
+      summary: Remove all items from the active cart
+      parameters:
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      responses:
+        '200': { description: Cleared cart }
+        '403': { description: Invalid CSRF token }
+  /cart/items:
+    post:
+      tags: [Cart]
+      summary: Add quantity to an existing cart line or create a new line
+      parameters:
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [variantId, quantity]
+              properties:
+                variantId: { type: string, format: uuid }
+                quantity: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        '201': { description: Updated cart }
+        '400': { description: Validation failed }
+        '409': { description: Variant unavailable or insufficient stock }
+  /cart/items/{itemId}:
+    patch:
+      tags: [Cart]
+      summary: Set absolute quantity for an item in current cart
+      parameters:
+        - { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false, required: [quantity], properties: { quantity: { type: integer, minimum: 1, maximum: 100 } } }
+      responses:
+        '200': { description: Updated cart }
+        '404': { description: Item not found in this cart }
+        '409': { description: Insufficient stock }
+    delete:
+      tags: [Cart]
+      summary: Remove a line from the current cart
+      parameters:
+        - { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      responses:
+        '200': { description: Updated cart }
+        '404': { description: Item not found in this cart }
+  /cart/merge:
+    post:
+      tags: [Cart]
+      summary: Merge the guest cart into the authenticated user cart atomically
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      responses:
+        '200': { description: Merged cart; guest cookie cleared }
+        '401': { description: Authentication required }
+        '409': { description: Insufficient stock or item limit; original carts unchanged }
 components:
   parameters:
     CsrfHeader:
