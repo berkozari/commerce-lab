@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CommerceLab API
-  version: 0.2.0
+  version: 0.3.0
   description: Cookie-based authentication. Obtain a CSRF token before every state-changing request.
 servers:
   - url: http://localhost:3000/api/v1
@@ -394,6 +394,131 @@ paths:
         '200': { description: Merged cart; guest cookie cleared }
         '401': { description: Authentication required }
         '409': { description: Insufficient stock or item limit; original carts unchanged }
+  /checkout:
+    post:
+      tags: [Checkout]
+      summary: Atomically create an unpaid order from the authenticated user's cart
+      description: Requires a stable Idempotency-Key header (16-100 URL-safe characters). Replaying the same key/address returns the existing order. Shipping is free in this local demo.
+      security:
+        - accessCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 100
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shippingAddress]
+              additionalProperties: false
+              properties:
+                shippingAddress:
+                  type: object
+                  required: [recipientName, phone, country, city, district, addressLine]
+                  properties:
+                    recipientName: { type: string }
+                    phone: { type: string }
+                    country: { const: TR }
+                    city: { type: string }
+                    district: { type: string }
+                    addressLine: { type: string }
+                    postalCode: { type: string }
+      responses:
+        '201': { description: New unpaid order created; stock reserved and cart cleared }
+        '200': { description: Existing order returned for replayed idempotency key }
+        '400': { description: Invalid request or missing idempotency key }
+        '401': { description: Authentication required }
+        '403': { description: Invalid CSRF token }
+        '409': { description: Stock conflict, empty cart or reused key with different payload }
+  /orders:
+    get:
+      tags: [Orders]
+      summary: List current user's orders
+      security:
+        - accessCookie: []
+      responses:
+        '200': { description: Paginated owned orders }
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get an owned order
+      security:
+        - accessCookie: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Order details }
+        '404': { description: Not found or not owned }
+  /orders/{id}/demo-payment:
+    post:
+      tags: [Orders]
+      summary: Simulate success or failure of payment (no payment provider or card data)
+      security:
+        - accessCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome]
+              additionalProperties: false
+              properties:
+                outcome: { type: string, enum: [success, failure] }
+      responses:
+        '200': { description: Updated order; failure cancels and restores inventory }
+        '409': { description: Invalid payment state }
+  /admin/orders:
+    get:
+      tags: [Orders Admin]
+      summary: List all orders (ADMIN)
+      security:
+        - accessCookie: []
+      responses:
+        '200': { description: Paginated orders }
+        '403': { description: Forbidden }
+  /admin/orders/{id}/status:
+    patch:
+      tags: [Orders Admin]
+      summary: Advance fulfillment status or cancel eligible order
+      security:
+        - accessCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              additionalProperties: false
+              properties:
+                status: { type: string, enum: [PROCESSING, SHIPPED, DELIVERED, CANCELLED] }
+      responses:
+        '200': { description: Updated order; cancellation restocks items }
+        '409': { description: Invalid status transition }
+
 components:
   parameters:
     CsrfHeader:
