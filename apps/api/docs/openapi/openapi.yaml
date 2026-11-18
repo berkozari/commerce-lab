@@ -121,6 +121,207 @@ paths:
           description: Current user, excluding password hash
         '401':
           description: Authentication required
+  /categories:
+    get:
+      tags: [Catalog]
+      summary: List categories
+      parameters:
+        - name: parentId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Categories }
+  /products:
+    get:
+      tags: [Catalog]
+      summary: List active products (paginated)
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: categoryId, in: query, schema: { type: string, format: uuid } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, oldest, name-asc, name-desc] } }
+      responses:
+        '200': { description: Paginated active products }
+        '400': { description: Invalid query }
+  /products/{slug}:
+    get:
+      tags: [Catalog]
+      summary: Get active product by slug
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Public product with active variants }
+        '404': { description: Not found or unpublished }
+  /admin/products:
+    get:
+      tags: [Catalog Admin]
+      summary: List products including drafts and archived
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50 } }
+        - { name: status, in: query, schema: { type: string, enum: [DRAFT, ACTIVE, ARCHIVED] } }
+      responses:
+        '200': { description: Products }
+        '403': { description: Admin role required }
+    post:
+      tags: [Catalog Admin]
+      summary: Create a DRAFT product
+      security: [{ accessCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [categoryId, name, slug]
+              properties:
+                categoryId: { type: string, format: uuid }
+                name: { type: string }
+                slug: { type: string }
+                description: { type: [string, 'null'] }
+                status: { type: string, const: DRAFT }
+      responses:
+        '201': { description: Created }
+  /admin/products/{id}:
+    get:
+      tags: [Catalog Admin]
+      security: [{ accessCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Product details }
+    patch:
+      tags: [Catalog Admin]
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: 'Partial product fields, including status' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Catalog Admin]
+      summary: Archive instead of hard deletion
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      responses:
+        '200': { description: Archived }
+  /admin/categories:
+    post:
+      tags: [Catalog Admin]
+      summary: Create category
+      security: [{ accessCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name, slug], properties: { name: { type: string }, slug: { type: string }, parentId: { type: [string, 'null'], format: uuid } } }
+      responses:
+        '201': { description: Created }
+  /admin/categories/{id}:
+    patch:
+      tags: [Catalog Admin]
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: Partial category fields }
+      responses:
+        '200': { description: Updated }
+  /admin/products/{id}/variants:
+    post:
+      tags: [Catalog Admin]
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [sku, name, price], properties: { sku: { type: string }, name: { type: string }, price: { type: string, example: '129.99' }, quantity: { type: integer, minimum: 0 } } }
+      responses:
+        '201': { description: Variant and inventory created }
+  /admin/products/{id}/variants/{variantId}:
+    patch:
+      tags: [Catalog Admin]
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: variantId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: Partial variant fields }
+      responses:
+        '200': { description: Updated }
+  /admin/products/{id}/images:
+    post:
+      tags: [Catalog Admin]
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [url], properties: { url: { type: string, format: uri }, altText: { type: string }, position: { type: integer, minimum: 0 } } }
+      responses:
+        '201': { description: Added }
+  /admin/products/{id}/images/{imageId}:
+    patch:
+      tags: [Catalog Admin]
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: imageId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: Partial image fields }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Catalog Admin]
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: imageId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      responses:
+        '200': { description: Deleted }
+  /admin/inventory/{variantId}:
+    patch:
+      tags: [Catalog Admin]
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: variantId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [quantity], properties: { quantity: { type: integer, minimum: 0 } } }
+      responses:
+        '200': { description: Inventory updated }
 components:
   parameters:
     CsrfHeader:

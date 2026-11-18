@@ -15,9 +15,7 @@
         "sourceMap": true
     },
     "include": [
-        "src/**/*.ts",
-        "src/lib/auth-crypto.js",
-        "src/lib/auth-cookies.js"
+        "src/**/*.ts"
     ],
     "exclude": [
         "dist",
