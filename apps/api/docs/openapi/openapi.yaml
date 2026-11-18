@@ -1,0 +1,57 @@
+openapi: 3.1.0
+info:
+  title: CommerceLab API
+  version: 0.1.0
+  description: Initial CommerceLab API contract. Authentication, catalog, carts and orders will be added in later milestones.
+servers:
+  - url: http://localhost:3000/api/v1
+paths:
+  /health:
+    get:
+      summary: Legacy-compatible liveness check
+      operationId: getHealth
+      tags: [Health]
+      responses:
+        '200':
+          description: Application is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /health/live:
+    get:
+      summary: Liveness check
+      operationId: getLiveness
+      tags: [Health]
+      responses:
+        '200':
+          description: Process is running
+  /health/ready:
+    get:
+      summary: Database readiness check
+      operationId: getReadiness
+      tags: [Health]
+      responses:
+        '200':
+          description: Database is available
+        '503':
+          description: Database is unavailable
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [status, service]
+          properties:
+            status:
+              type: string
+              const: ok
+            service:
+              type: string
+              const: commerce-lab-api
