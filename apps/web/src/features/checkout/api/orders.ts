@@ -15,8 +15,11 @@ export type Order = {
     createdAt: string; updatedAt: string;
 };
 export type CheckoutResult = { order: Order; replayed: boolean };
+export type OrderListResult = { items: Order[]; total: number; page: number; limit: number };
 
 export const ordersApi = {
+    list: (page: number, limit = 10) =>
+        apiRequest<OrderListResult>(`/api/v1/orders?page=${page}&limit=${limit}`),
     checkout: async (shippingAddress: ShippingAddress, key: string) => {
         const csrf = await getCsrfToken();
         return apiRequest<CheckoutResult>("/api/v1/checkout", {

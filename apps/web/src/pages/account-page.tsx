@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCurrentUser, useLogout, useLogoutAll } from "../features/auth/hooks/use-auth";
 import { ApiError } from "../lib/api-client";
 
@@ -18,6 +18,7 @@ export function AccountPage() {
         <p className="text-sm font-bold uppercase tracking-widest text-brand">Your account</p>
         <h1 className="mt-3 text-4xl font-extrabold">Hello, {user?.name}</h1>
         <p className="mt-2 text-muted">Review your account and manage your demo sessions.</p>
+        <Link to="/orders" className="mt-7 inline-flex rounded-xl border border-[#cbd8d3] bg-white px-5 py-3 text-sm font-bold text-brand hover:bg-[#eff5ef]">View my orders</Link>
         <div className="mt-9 rounded-2xl border border-[#e1e8e2] bg-white p-6 sm:p-8">
             <dl className="grid gap-5 sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wider text-muted">Name</dt><dd className="mt-1 font-semibold">{user?.name}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wider text-muted">Email</dt><dd className="mt-1 font-semibold">{user?.email}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wider text-muted">Role</dt><dd className="mt-1 font-semibold">{user?.role}</dd></div></dl>
             {(logout.error || logoutAll.error) && <p role="alert" className="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-800">{(logout.error ?? logoutAll.error) instanceof ApiError ? (logout.error ?? logoutAll.error)?.message : "Could not sign out. Please retry."}</p>}

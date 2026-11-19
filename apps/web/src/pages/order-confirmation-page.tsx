@@ -20,6 +20,6 @@ export function OrderConfirmationPage() {
             {payment.isError && <p className="mt-4 text-sm text-red-700" role="alert">{payment.error instanceof ApiError ? payment.error.message : "Demo payment failed. Please retry."}</p>}
             {order.paymentStatus === "PAID_DEMO" && <p className="mt-6 rounded-xl bg-green-50 p-4 text-sm text-green-800" role="status">Demo payment confirmed. Thank you!</p>}
             {order.status === "CANCELLED" && <p className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-800" role="status">Order cancelled. No payment was charged.</p>}
-        </div><Link to="/products" className="mt-7 inline-block font-semibold text-brand underline">Continue shopping</Link>
+        </div><div className="mt-7 flex flex-wrap gap-6"><Link to="/orders" className="font-semibold text-brand underline">All my orders</Link><Link to="/products" className="font-semibold text-brand underline">Continue shopping</Link></div>
     </main>;
 }
