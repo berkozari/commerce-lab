@@ -1,34 +1,25 @@
-import { ArrowRight, Layers3, ShieldCheck, ShoppingBag } from "lucide-react";
+import { ArrowRight, MoveUpRight, Sparkles, PackageSearch } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
-
-const steps = [
-    { icon: Layers3, name: "Foundation", description: "Routing, typed API access, TanStack Query and a reusable UI layer." },
-    { icon: ShoppingBag, name: "Storefront", description: "Homepage, categories, product details, search and filters arrive in EC-009." },
-    { icon: ShieldCheck, name: "Customer experience", description: "Authentication and checkout interfaces follow after the storefront." },
-];
+import { ProductCard } from "../features/catalog/components/product-card";
+import { CatalogError, CatalogLoading } from "../features/catalog/components/catalog-feedback";
+import { useCategories, useProducts } from "../features/catalog/hooks/use-catalog";
 
 export function HomePage() {
-    return (
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
-            <div className="max-w-3xl">
-                <p className="mb-5 inline-flex rounded-full bg-[#e1f1e8] px-3 py-1 text-xs font-bold uppercase tracking-[0.13em] text-brand">EC-008 · Frontend foundation</p>
-                <h1 className="text-4xl font-bold leading-[1.09] tracking-[-0.045em] sm:text-6xl">Everything in place for a better <span className="text-brand">shopping experience.</span></h1>
-                <p className="mt-7 max-w-2xl text-lg leading-8 text-muted">The CommerceLab frontend is connected to the API and ready for real product discovery. The storefront pages will be built next.</p>
-                <div className="mt-8"><Button asChild><Link to="/system">Check API connection <ArrowRight size={17} aria-hidden="true" /></Link></Button></div>
+    const categories = useCategories();
+    const featured = useProducts({ sort: "newest", page: 1, limit: 6 });
+    return <div>
+        <section className="relative overflow-hidden bg-[#eaf0e8]"><div className="absolute -right-36 -top-48 h-[650px] w-[650px] rounded-full bg-[#bedac8] opacity-65 blur-3xl" aria-hidden="true" /><div className="absolute bottom-0 right-[8%] hidden h-56 w-56 rotate-12 rounded-[4rem] border-[28px] border-[#83b29b] opacity-60 md:block" aria-hidden="true" />
+            <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 py-20 sm:px-8 md:grid-cols-[1.3fr_0.7fr] md:py-28"><div><p className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#a9c8b4] bg-white/60 px-4 py-2 text-xs font-bold uppercase tracking-[.15em] text-brand"><Sparkles size={15} /> Discover something different</p><h1 className="max-w-3xl text-5xl font-bold leading-[1.05] tracking-[-.055em] sm:text-6xl lg:text-7xl">Good finds.<br /><span className="text-brand">Everyday joy.</span></h1><p className="mt-6 max-w-lg text-lg leading-8 text-muted">Thoughtfully curated electronics, home essentials and accessories. Explore pieces that make life feel a little easier.</p><Button asChild size="lg" className="mt-9"><Link to="/products">Shop the collection <ArrowRight size={18} /></Link></Button></div>
+                <div className="relative mx-auto hidden aspect-square w-full max-w-xs items-center justify-center md:flex"><div className="absolute inset-2 rotate-12 rounded-[3.5rem] bg-[#3f8069]" /><div className="absolute inset-7 -rotate-6 rounded-[3rem] bg-[#f8faf5]" /><div className="relative flex h-40 w-40 items-center justify-center rounded-full bg-[#d4e8d6] text-6xl shadow-xl" aria-hidden="true">✦</div></div>
             </div>
-            <section aria-labelledby="roadmap" className="mt-20">
-                <h2 id="roadmap" className="mb-6 text-xl font-bold tracking-tight">What this foundation enables</h2>
-                <div className="grid gap-4 md:grid-cols-3">
-                    {steps.map(({ icon: Icon, name, description }) => (
-                        <article key={name} className="rounded-2xl border border-[#e1e8e2] bg-white p-7 shadow-sm">
-                            <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-[#eaf3ed] text-brand"><Icon aria-hidden="true" size={21} /></div>
-                            <h3 className="text-lg font-semibold">{name}</h3>
-                            <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-                        </article>
-                    ))}
-                </div>
-            </section>
-        </div>
-    );
+        </section>
+        <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20" aria-labelledby="category-heading"><div className="mb-8 flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-brand">Discover</p><h2 id="category-heading" className="mt-2 text-3xl font-bold tracking-tight">Browse by category</h2></div><Link to="/products" className="inline-flex items-center gap-1 text-sm font-semibold text-brand">All products <MoveUpRight size={16} /></Link></div>
+            {categories.isPending ? <p role="status" className="text-muted">Loading categories…</p> : categories.isError ? <CatalogError retry={() => void categories.refetch()} /> : categories.data.length === 0 ? <p className="rounded-3xl border border-dashed border-[#d6e1d7] p-8 text-muted">Categories will appear here when added by an administrator.</p> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{categories.data.slice(0, 6).map((category, index) => <Link key={category.id} to={`/categories/${category.slug}`} className={`group relative flex min-h-44 items-end overflow-hidden rounded-[1.6rem] p-6 ${index % 3 === 0 ? "bg-[#dcece1]" : index % 3 === 1 ? "bg-[#e9e5d9]" : "bg-[#e2e8ed]"}`}><span className="absolute -right-4 -top-8 text-[9rem] font-black leading-none text-white/45" aria-hidden="true">{category.name[0]}</span><span className="relative flex w-full items-center justify-between text-xl font-bold">{category.name}<ArrowRight size={19} className="transition-transform group-hover:translate-x-1" /></span></Link>)}</div>}
+        </section>
+        <section className="bg-white py-16 sm:py-20" aria-labelledby="latest-heading"><div className="mx-auto max-w-6xl px-5 sm:px-8"><div className="mb-9 flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-brand">Fresh arrivals</p><h2 id="latest-heading" className="mt-2 text-3xl font-bold tracking-tight">Recently added</h2></div><Link to="/products" className="inline-flex items-center gap-1 text-sm font-semibold text-brand">View all <ArrowRight size={16} /></Link></div>
+            {featured.isPending ? <CatalogLoading /> : featured.isError ? <CatalogError message={featured.error instanceof Error ? featured.error.message : undefined} retry={() => void featured.refetch()} /> : featured.data.items.length ? <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{featured.data.items.map(product => <ProductCard key={product.id} product={product} />)}</div> : <div className="flex flex-col items-center rounded-3xl border border-dashed border-[#d6e1d7] p-12 text-center"><PackageSearch size={36} className="text-brand" /><h3 className="mt-4 font-bold">Products are coming soon</h3><p className="mt-2 text-sm text-muted">Active products will appear as your catalog grows.</p></div>}
+        </div></section>
+        <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8"><div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] bg-[#183c32] p-9 text-white sm:flex-row sm:items-center sm:p-12"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-[#b7d9c3]">Explore more</p><h2 className="mt-3 text-3xl font-bold tracking-tight">Your next favorite find is here.</h2><p className="mt-3 text-sm text-[#d1e2d6]">Browse the full selection and discover something new.</p></div><Button asChild variant="outline" className="shrink-0 text-ink"><Link to="/products">Browse all products <ArrowRight size={17} /></Link></Button></div></section>
+    </div>;
 }
