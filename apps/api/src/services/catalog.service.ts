@@ -46,6 +46,16 @@ function listWhere(query: ProductListQuery, status?: "DRAFT" | "ACTIVE" | "ARCHI
     return {
         ...(status ? { status } : {}),
         ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+        ...(query.minPrice !== undefined || query.maxPrice !== undefined ? {
+            variants: {
+                some: {
+                    isActive: true, price: {
+                        ...(query.minPrice !== undefined ? { gte: new Prisma.Decimal(query.minPrice) } : {}),
+                        ...(query.maxPrice !== undefined ? { lte: new Prisma.Decimal(query.maxPrice) } : {}),
+                    }
+                }
+            },
+        } : {}),
         ...(query.q ? { OR: [{ name: { contains: query.q, mode: "insensitive" } }, { description: { contains: query.q, mode: "insensitive" } }] } : {}),
     };
 }
@@ -78,13 +88,47 @@ export const catalogService = {
     }),
     async listProducts(query: ProductListQuery, admin = false, adminStatus?: AdminProductListQuery["status"]) {
         const where = listWhere(query, admin ? adminStatus : "ACTIVE");
-        const [total, items] = await repo.transaction(async (tx) => Promise.all([
-            tx.product.count({ where }),
-            tx.product.findMany({
+        const [total, items] = await repo.transaction(async (tx) => {
+            const total = await tx.product.count({ where });
+            if (query.sort === "price-asc" || query.sort === "price-desc") {
+                // Sort by lowest ACTIVE variant price. Database pagination keeps pages globally ordered.
+                // Parameterized SQL avoids loading and sorting the complete catalog in application memory.
+                const filters: Prisma.Sql[] = [];
+                if (!admin || adminStatus) filters.push(Prisma.sql`p."status"::text = ${admin ? adminStatus! : "ACTIVE"}`);
+                if (query.categoryId) filters.push(Prisma.sql`p."categoryId" = ${query.categoryId}::uuid`);
+                if (query.q) {
+                    const term = `%${query.q}%`;
+                    filters.push(Prisma.sql`(p."name" ILIKE ${term} OR p."description" ILIKE ${term})`);
+                }
+                if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+                    const range: Prisma.Sql[] = [Prisma.sql`pv2."productId" = p.id`, Prisma.sql`pv2."isActive" = true`];
+                    if (query.minPrice !== undefined) range.push(Prisma.sql`pv2."price" >= ${query.minPrice}::numeric`);
+                    if (query.maxPrice !== undefined) range.push(Prisma.sql`pv2."price" <= ${query.maxPrice}::numeric`);
+                    filters.push(Prisma.sql`EXISTS (SELECT 1 FROM "ProductVariant" pv2 WHERE ${Prisma.join(range, " AND ")})`);
+                }
+                const condition = filters.length ? Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}` : Prisma.empty;
+                const direction = query.sort === "price-asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+                const offset = (query.page - 1) * query.limit;
+                const ids = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+                    SELECT p.id FROM "Product" p
+                    LEFT JOIN "ProductVariant" pv ON pv."productId" = p.id AND pv."isActive" = true
+                    ${condition}
+                    GROUP BY p.id
+                    ORDER BY MIN(pv."price") ${direction} NULLS LAST, p.id ASC
+                    LIMIT ${query.limit} OFFSET ${offset}
+                `);
+                if (!ids.length) return [total, []] as const;
+                const products = await tx.product.findMany({ where: { id: { in: ids.map((row) => row.id) } }, include: productDetails });
+                const positions = new Map(ids.map((row, index) => [row.id, index]));
+                products.sort((a, b) => (positions.get(a.id) ?? 0) - (positions.get(b.id) ?? 0));
+                return [total, products] as const;
+            }
+            const products = await tx.product.findMany({
                 where, orderBy: ordering(query.sort), skip: (query.page - 1) * query.limit,
-                take: query.limit, include: productDetails
-            }),
-        ]));
+                take: query.limit, include: productDetails,
+            });
+            return [total, products] as const;
+        });
         // Unauthenticated clients must not see inactive variants or their inventory quantities.
         const data = admin ? items : items.map(({ variants, ...product }) => ({
             ...product, variants: variants.filter((variant) => variant.isActive).map(({ inventory, ...variant }) => { void inventory; return variant; }),

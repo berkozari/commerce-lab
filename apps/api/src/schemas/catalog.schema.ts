@@ -37,13 +37,14 @@ export const imageUpdateSchema = imageCreateSchema.partial().refine((v) => Objec
 export const stockUpdateSchema = z.strictObject({ quantity: nonnegativeInt });
 
 export const listProductsQuerySchema = z.strictObject({
+    minPrice: money.optional(), maxPrice: money.optional(),
     page: z.coerce.number().int().min(1).max(100000).default(1),
     limit: z.coerce.number().int().min(1).max(50).default(20),
     q: z.string().trim().min(1).max(100).optional(),
     categoryId: uuid.optional(),
-    sort: z.enum(["newest", "oldest", "name-asc", "name-desc"]).default("newest"),
-});
-export const adminListProductsQuerySchema = listProductsQuerySchema.extend({ status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional() });
+    sort: z.enum(["newest", "oldest", "name-asc", "name-desc", "price-asc", "price-desc"]).default("newest"),
+}).refine((value) => value.minPrice === undefined || value.maxPrice === undefined || Number(value.minPrice) <= Number(value.maxPrice), { message: "Minimum price cannot exceed maximum price", path: ["minPrice"] });
+export const adminListProductsQuerySchema = listProductsQuerySchema.safeExtend({ status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional() });
 export const listCategoriesQuerySchema = z.strictObject({ parentId: uuid.optional() });
 
 export type ProductListQuery = z.infer<typeof listProductsQuerySchema>;

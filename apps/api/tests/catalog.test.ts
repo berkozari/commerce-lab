@@ -28,9 +28,53 @@ describe("Catalog validation (database-free)", () => {
         expect(productUpdateSchema.safeParse({}).success).toBe(false);
         expect(stockUpdateSchema.safeParse({ quantity: -1 }).success).toBe(false);
     });
-    it("limits pagination and rejects unsupported sort", () => {
-        expect(listProductsQuerySchema.safeParse({ page: "1", limit: "51" }).success).toBe(false);
-        expect(listProductsQuerySchema.safeParse({ sort: "price-asc" }).success).toBe(false);
+    it("limits pagination and validates supported sorting", () => {
+        expect(
+            listProductsQuerySchema.safeParse({
+                page: "1",
+                limit: "1000",
+            }).success,
+        ).toBe(false);
+
+        expect(
+            listProductsQuerySchema.safeParse({
+                sort: "price-asc",
+            }).success,
+        ).toBe(true);
+
+        expect(
+            listProductsQuerySchema.safeParse({
+                sort: "price-desc",
+            }).success,
+        ).toBe(true);
+
+        expect(
+            listProductsQuerySchema.safeParse({
+                sort: "invalid-sort",
+            }).success,
+        ).toBe(false);
+    });
+
+    it("validates product price filters", () => {
+        expect(
+            listProductsQuerySchema.safeParse({
+                minPrice: "100",
+                maxPrice: "1500",
+            }).success,
+        ).toBe(true);
+
+        expect(
+            listProductsQuerySchema.safeParse({
+                minPrice: "-10",
+            }).success,
+        ).toBe(false);
+
+        expect(
+            listProductsQuerySchema.safeParse({
+                minPrice: "1500",
+                maxPrice: "100",
+            }).success,
+        ).toBe(false);
     });
 });
 
