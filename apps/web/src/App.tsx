@@ -9,6 +9,9 @@ import { NotFoundPage } from "./pages/not-found-page";
 import { LoginPage } from "./pages/login-page";
 import { RegisterPage } from "./pages/register-page";
 import { AccountPage } from "./pages/account-page";
+import { CartPage } from "./pages/cart-page";
+import { CheckoutPage } from "./pages/checkout-page";
+import { OrderConfirmationPage } from "./pages/order-confirmation-page";
 
 export const router = createBrowserRouter([{
     element: <SiteLayout />,
@@ -20,7 +23,14 @@ export const router = createBrowserRouter([{
         { path: "/system", element: <SystemPage /> },
         { path: "/login", element: <LoginPage /> },
         { path: "/register", element: <RegisterPage /> },
-        { element: <ProtectedRoute />, children: [{ path: "/account", element: <AccountPage /> }] },
+        { path: "/cart", element: <CartPage /> },
+        {
+            element: <ProtectedRoute />, children: [
+                { path: "/account", element: <AccountPage /> },
+                { path: "/checkout", element: <CheckoutPage /> },
+                { path: "/orders/:id", element: <OrderConfirmationPage /> },
+            ]
+        },
         { path: "*", element: <NotFoundPage /> },
     ],
 }]);
