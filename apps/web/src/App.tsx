@@ -12,6 +12,7 @@ import { AccountPage } from "./pages/account-page";
 import { CartPage } from "./pages/cart-page";
 import { CheckoutPage } from "./pages/checkout-page";
 import { OrderConfirmationPage } from "./pages/order-confirmation-page";
+import { OrdersPage } from "./pages/orders-page";
 
 export const router = createBrowserRouter([{
     element: <SiteLayout />,
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([{
             element: <ProtectedRoute />, children: [
                 { path: "/account", element: <AccountPage /> },
                 { path: "/checkout", element: <CheckoutPage /> },
+                { path: "/orders", element: <OrdersPage /> },
                 { path: "/orders/:id", element: <OrderConfirmationPage /> },
             ]
         },
