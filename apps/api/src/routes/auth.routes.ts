@@ -1,19 +1,30 @@
 import { Router } from "express";
-import { authRateLimit } from "../middlewares/auth-rate-limit.middleware.js";
+import { authRateLimit, refreshRateLimit } from "../middlewares/auth-rate-limit.middleware.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import { requireCsrf } from "../middlewares/csrf.middleware.js";
 import { validateBody } from "../middlewares/validate.middleware.js";
 import { loginSchema, registerSchema } from "../schemas/auth.schema.js";
 import { authService } from "../services/auth.service.js";
-import { createCsrfToken } from "../lib/auth-crypto.js";
-import { clearAuthCookies, REFRESH_COOKIE, setAuthCookies, setCsrfCookie } from "../lib/auth-cookies.js";
+import { createCsrfToken, isValidCsrfToken } from "../lib/auth-crypto.js";
+import { clearAuthCookies, CSRF_COOKIE, REFRESH_COOKIE, setAuthCookies, setCsrfCookie } from "../lib/auth-cookies.js";
 
 export const authRouter = Router();
 
-authRouter.get("/csrf", (_req, res) => {
-    const csrfToken = createCsrfToken();
-    setCsrfCookie(res, csrfToken);
+// Authentication endpoints include private user data and Set-Cookie responses.
+// Prevent intermediaries and browsers from caching even error/401 responses.
+authRouter.use((_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
+    next();
+});
+
+authRouter.get("/csrf", (req, res) => {
+    const existingToken: unknown = req.cookies?.[CSRF_COOKIE];
+    // Multiple tabs may fetch /csrf concurrently. Reuse a valid signed token
+    // rather than rotating the cookie out from under an in-flight mutation.
+    const csrfToken = typeof existingToken === "string" && isValidCsrfToken(existingToken, existingToken)
+        ? existingToken
+        : createCsrfToken();
+    setCsrfCookie(res, csrfToken);
     res.status(200).json({ success: true, data: { csrfToken } });
 });
 
@@ -29,7 +40,7 @@ authRouter.post("/login", authRateLimit, requireCsrf, validateBody(loginSchema),
     res.status(200).json({ success: true, data: { user: result.user } });
 });
 
-authRouter.post("/refresh", authRateLimit, requireCsrf, async (req, res) => {
+authRouter.post("/refresh", refreshRateLimit, requireCsrf, async (req, res) => {
     const result = await authService.refresh(req.cookies?.[REFRESH_COOKIE] as string | undefined);
     setAuthCookies(res, result.accessToken, result.refreshToken);
     res.status(200).json({ success: true, data: { user: result.user } });

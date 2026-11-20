@@ -6,6 +6,10 @@ import { AppError } from "../utils/app-error.js";
 import { createRefreshToken, getRefreshSessionId, hashToken, REFRESH_TTL_MS, signAccessToken } from "../lib/auth-crypto.js";
 import type { RegisterInput, LoginInput } from "../schemas/auth.schema.js";
 
+// A short grace period avoids revoking sessions when two tabs refresh concurrently.
+// A grace-period replay is rejected (401) but does not revoke the session.
+export const REFRESH_REUSE_GRACE_MS = 5_000;
+
 export type AuthUser = { id: string; email: string; name: string; role: "CUSTOMER" | "ADMIN" };
 
 type LoginResult = { user: AuthUser; accessToken: string; refreshToken: string };
@@ -47,15 +51,26 @@ export const authService = {
         if (!sessionId || !token) throw new AppError("Invalid session", 401);
         const session = await authRepository.findSession(sessionId);
         if (!session || session.revokedAt || session.expiresAt <= new Date()) throw new AppError("Invalid session", 401);
-        if (session.refreshTokenHash !== hashToken(token)) {
-            // Any reuse of a rotated token revokes the entire session.
-            await authRepository.revokeSession(sessionId);
-            throw new AppError("Session revoked", 401);
+        const incomingHash = hashToken(token);
+        if (session.refreshTokenHash !== incomingHash) {
+            // A token with a valid session ID but an unknown secret proves nothing.
+            // Never let such a token revoke a legitimate user's session.
+            if (session.previousRefreshTokenHash === incomingHash && session.previousRotatedAt) {
+                const cutoff = new Date(Date.now() - REFRESH_REUSE_GRACE_MS);
+                if (session.previousRotatedAt < cutoff) {
+                    // Conditional update avoids revoking a session that rotated again meanwhile.
+                    await authRepository.revokeReusedPreviousToken(sessionId, incomingHash, cutoff);
+                    throw new AppError("Session revoked", 401);
+                }
+                // Likely simultaneous requests. Reject the stale token without revocation.
+                throw new AppError("Session changed; retry with the latest cookie", 401);
+            }
+            throw new AppError("Invalid session", 401);
         }
         const user = await authRepository.findUserById(session.userId);
         if (!user) throw new AppError("Invalid session", 401);
         const newRefreshToken = createRefreshToken(sessionId);
-        const result = await authRepository.rotateSession(sessionId, hashToken(token), hashToken(newRefreshToken), new Date(Date.now() + REFRESH_TTL_MS));
+        const result = await authRepository.rotateSession(sessionId, incomingHash, hashToken(newRefreshToken), new Date(Date.now() + REFRESH_TTL_MS));
         if (result.count !== 1) {
             // A concurrent request may have rotated the token. Do not revoke it based on a race.
             throw new AppError("Session changed; please sign in again", 401);

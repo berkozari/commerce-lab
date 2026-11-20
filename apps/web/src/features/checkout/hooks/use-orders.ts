@@ -16,7 +16,7 @@ export function useCheckout() {
         mutationFn: ({ shippingAddress, key }: { shippingAddress: ShippingAddress; key: string }) => ordersApi.checkout(shippingAddress, key), onSuccess: (result) => {
             client.removeQueries({ queryKey: cartKey });
             client.setQueryData(["orders", result.order.id], result.order);
-            void client.invalidateQueries({ queryKey: ["orders"] });
+            void client.invalidateQueries({ queryKey: ["orders", "list"] });
         }
     });
 }
@@ -25,7 +25,7 @@ export function useDemoPayment(id: string) {
     return useMutation({
         mutationFn: (outcome: "success" | "failure") => ordersApi.pay(id, outcome), onSuccess: (order) => {
             client.setQueryData(["orders", id], order);
-            void client.invalidateQueries({ queryKey: ["orders"] });
+            void client.invalidateQueries({ queryKey: ["orders", "list"] });
         }
     });
 }
