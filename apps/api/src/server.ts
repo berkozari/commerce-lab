@@ -2,6 +2,7 @@ import { app } from "./app.js";
 import { env, requireDatabaseUrl, requireAuthSecrets } from "./config/env.js";
 import { disconnectDatabase } from "./config/database.js";
 import { logger } from "./lib/logger.js";
+import { safeErrorType } from "./lib/observability.js";
 
 // Fail fast on missing DB configuration in actual server startup, not during app-only unit tests.
 requireDatabaseUrl();
@@ -25,7 +26,7 @@ async function shutdown(signal: string): Promise<void> {
         await disconnectDatabase();
         clearTimeout(timeout);
     } catch (error) {
-        logger.error({ err: error }, "Shutdown failed");
+        logger.error({ errorType: safeErrorType(error) }, "Shutdown failed");
         process.exitCode = 1;
     }
 }

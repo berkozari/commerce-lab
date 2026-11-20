@@ -6,6 +6,11 @@ import { AppError } from "../utils/app-error.js";
 
 export const requireCsrf: RequestHandler = (req, _res, next) => {
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) { next(); return; }
+    // Browsers attach this metadata even when Origin is missing; reject
+    // cross-site mutations instead of relying solely on the CSRF header.
+    if (req.get("sec-fetch-site") === "cross-site") {
+        next(new AppError("Cross-site request not allowed", 403)); return;
+    }
     const origin = req.get("origin");
     // Origin is sent by browsers for credentialed cross-origin requests.
     if (origin && origin !== env.CORS_ORIGIN) { next(new AppError("Origin not allowed", 403)); return; }

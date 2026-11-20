@@ -2,7 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 
-export const GUEST_CART_COOKIE = "cl_guest_cart";
+// Guest cart remains limited to /api/v1/cart, so it cannot use __Host-.
+export const GUEST_CART_COOKIE = env.NODE_ENV === "production" ? "__Secure-cl_guest_cart" : "cl_guest_cart";
 const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
 

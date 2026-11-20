@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
 import { requireCsrf } from "../middlewares/csrf.middleware.js";
+import { privateNoStore } from "../middlewares/private-cache.middleware.js";
 import { validateBody } from "../middlewares/validate.middleware.js";
 import {
     checkoutSchema, demoPaymentSchema, adminOrderStatusSchema,
@@ -12,6 +13,10 @@ import { AppError } from "../utils/app-error.js";
 export const checkoutRouter = Router();
 export const ordersRouter = Router();
 export const adminOrdersRouter = Router();
+
+checkoutRouter.use(privateNoStore);
+ordersRouter.use(privateNoStore);
+adminOrdersRouter.use(privateNoStore);
 
 checkoutRouter.post("/", requireCsrf, requireAuth, validateBody(checkoutSchema), async (req, res) => {
     const rawKey = req.get("idempotency-key");

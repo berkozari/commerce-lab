@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
 import { requireCsrf } from "../middlewares/csrf.middleware.js";
+import { privateNoStore } from "../middlewares/private-cache.middleware.js";
 import { validateBody } from "../middlewares/validate.middleware.js";
 import { catalogService } from "../services/catalog.service.js";
 import {
@@ -12,6 +13,7 @@ import {
 
 export const catalogRouter = Router();
 export const adminCatalogRouter = Router();
+adminCatalogRouter.use(privateNoStore);
 
 const id = (value: unknown): string => uuid.parse(value);
 const slug = (value: unknown): string => z.string().min(2).max(200).parse(value);
