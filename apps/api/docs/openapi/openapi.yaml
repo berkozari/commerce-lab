@@ -140,7 +140,9 @@ paths:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
         - { name: q, in: query, schema: { type: string } }
         - { name: categoryId, in: query, schema: { type: string, format: uuid } }
-        - { name: sort, in: query, schema: { type: string, enum: [newest, oldest, name-asc, name-desc] } }
+        - { name: minPrice, in: query, schema: { type: string, pattern: '^(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?$' } }
+        - { name: maxPrice, in: query, schema: { type: string, pattern: '^(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?$' } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, oldest, name-asc, name-desc, price-asc, price-desc] } }
       responses:
         '200': { description: Paginated active products }
         '400': { description: Invalid query }
@@ -161,6 +163,11 @@ paths:
       parameters:
         - { name: page, in: query, schema: { type: integer, minimum: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50 } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: categoryId, in: query, schema: { type: string, format: uuid } }
+        - { name: minPrice, in: query, schema: { type: string, pattern: '^(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?$' } }
+        - { name: maxPrice, in: query, schema: { type: string, pattern: '^(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?$' } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, oldest, name-asc, name-desc, price-asc, price-desc] } }
         - { name: status, in: query, schema: { type: string, enum: [DRAFT, ACTIVE, ARCHIVED] } }
       responses:
         '200': { description: Products }
@@ -431,7 +438,7 @@ paths:
                     addressLine: { type: string }
                     postalCode: { type: string }
       responses:
-        '201': { description: New unpaid order created; stock reserved and cart cleared }
+        '201': { description: New unpaid order created; stock decremented and cart cleared }
         '200': { description: Existing order returned for replayed idempotency key }
         '400': { description: Invalid request or missing idempotency key }
         '401': { description: Authentication required }

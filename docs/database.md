@@ -1,63 +1,90 @@
 # CommerceLab — Database Design
 
-## Scope
+> **Source of truth:** [`apps/api/prisma/schema.prisma`](../apps/api/prisma/schema.prisma) plus the SQL in [`apps/api/prisma/migrations`](../apps/api/prisma/migrations). Prisma does **not** represent every PostgreSQL `CHECK` constraint or partial unique index. See [architecture](architecture.md) and [API contract](api.md).
 
-Single-store, TRY-only MVP. Models: `User`, `Address`, `Category`, `Product`, `ProductImage`, `ProductVariant`, `Inventory`, `Cart`, `CartItem`, `Order`, `OrderItem`.
+## Scope and models
 
-## Architecture decisions
-
-- Every sellable product must have at least one variant; application logic creates a default variant where needed. This invariant is **not** enforced by the relational schema.
-- Product variants own their `sku`, price and currency. `sku` is unique; products and categories have unique slugs.
-- Store prices using PostgreSQL `DECIMAL(12,2)` and Prisma `Decimal`; never use JavaScript floating-point arithmetic for checkout totals.
-- Snapshot product name, SKU, unit price and delivery address into each order. Archive products by default; do not destructively remove records needed by historical orders.
-- A cart item identifies one product variant and a quantity. `@@unique([cartId, variantId])` prevents duplicate lines.
-- A cart belongs **either** to a registered user **or** to a guest token, but not both. The second migration adds a database `CHECK` constraint for this, and a partial unique index allowing at most one cart per registered user. The existing unique guest-token index is retained.
-- Inventory quantities and amounts must be nonnegative; cart/order quantities must be positive. The second migration enforces these as PostgreSQL `CHECK` constraints. Prisma schema files do not represent these custom checks and partial indexes directly; **preserve the migration history**.
-- Checkout remains to be implemented: use a database transaction and conditionally decrement stock only where `quantity >= requestedQuantity`, check affected row counts, then create the order. The nonnegative check alone **does not** prevent overselling or guarantee atomic order creation.
-- Checkout recalculates prices and availability on the server. Orders require authentication. Payment is simulated; never collect payment-card data.
-- Category parent relationships are self-referencing with restrictive deletes. Application code will still need to prevent category cycles.
-- Product variant/inventory foreign keys and order history deliberately restrict destructive deletes. Products should be archived rather than hard deleted.
-- All examples use localhost PostgreSQL port `5433` to avoid conflicts with DevFlow's default `5432`.
-- Seed upserts three categories and three demo products. It does not reset stock on repeated runs. It **does** update demo product names/prices on repeat; avoid using seed against real customer-managed catalog data.
-
-## Entity relationships
+The application uses one PostgreSQL database for a single-store TRY demo. The current Prisma schema defines **12 models**: `User`, `Address`, `Category`, `Product`, `ProductImage`, `ProductVariant`, `Inventory`, `Cart`, `CartItem`, `Order`, `OrderItem`, and `AuthSession`.
 
 ```mermaid
 erDiagram
     USER ||--o{ ADDRESS : has
+    USER ||--o{ AUTH_SESSION : authenticates
     USER ||--o{ CART : owns
     USER ||--o{ ORDER : places
     CATEGORY o|--o{ CATEGORY : parent
-    CATEGORY ||--o{ PRODUCT : contains
-    PRODUCT ||--o{ PRODUCT_IMAGE : illustrates
+    CATEGORY ||--o{ PRODUCT : groups
+    PRODUCT ||--o{ PRODUCT_IMAGE : depicts
     PRODUCT ||--o{ PRODUCT_VARIANT : offers
-    PRODUCT_VARIANT ||--o| INVENTORY : tracks
-    CART ||--o{ CART_ITEM : contains
-    PRODUCT_VARIANT ||--o{ CART_ITEM : added_to
-    ORDER ||--o{ ORDER_ITEM : contains
-    PRODUCT_VARIANT o|--o{ ORDER_ITEM : snapshots
+    PRODUCT_VARIANT ||--o| INVENTORY : stocks
+    CART ||--o{ CART_ITEM : holds
+    PRODUCT_VARIANT ||--o{ CART_ITEM : referenced_by
+    ORDER ||--o{ ORDER_ITEM : captures
+    PRODUCT_VARIANT o|--o{ ORDER_ITEM : original_variant
 ```
 
-## Migration history
+`AUTH_SESSION` in the diagram corresponds to the Prisma model `AuthSession`; the relationship from an `OrderItem` to a `ProductVariant` is optional so order history can survive variant removal where allowed. Product and category relationships use restrictive deletion for integrity; the administration API **archives** products rather than permanently deleting them.
 
-1. `20261117135558_init_ecommerce` — 11 tables, enum types, foreign keys, uniqueness and baseline indexes.
-2. `20261117170000_integrity_constraints` — nonnegative stock/price checks; positive cart/order quantities; cart ownership check; one-cart-per-user partial unique index.
+## Modeling and consistency decisions
 
-The second migration is raw SQL because Prisma schema does not model PostgreSQL `CHECK` constraints and partial indexes directly. Never edit the first migration once it has been applied. Run the new migration only on the dedicated CommerceLab development database and inspect any failure before retrying.
+| Concern | Design |
+| --- | --- |
+| Money | `Decimal(12,2)` for prices/totals; server computes checkout totals using Prisma `Decimal` and formats monetary API amounts as decimal strings |
+| Category / catalog | Unique category and product slugs, unique variant SKU, publication status (`DRAFT`, `ACTIVE`, `ARCHIVED`) |
+| Inventory | One optional inventory row per variant in schema (`variantId` unique); conditional stock decrements prevent oversell during checkout |
+| Cart ownership | Exactly one owner: authenticated `userId` **or** `guestTokenHash`; partial unique index permits one persisted user cart |
+| Cart items | Unique `(cartId, variantId)` plus positive quantity constraint |
+| Order snapshots | Name, SKU, unit price and shipping address stored on order records independent of later product edits |
+| Checkout deduplication | Unique `(userId, idempotencyKey)` on `Order` and a request fingerprint for replay consistency |
+| Authentication | Refresh token hashes and previous-hash rotation metadata stored in `AuthSession`; no raw refresh token stored in DB |
 
-## Validation / release gates
+The schema alone does not guarantee “every active product has a sellable variant” or prevent category-parent cycles. Those are separate application rules or potential improvements.
 
-1. `pnpm --filter @commercelab/api exec prisma migrate deploy` applies pending committed migration SQL.
-2. `pnpm --filter @commercelab/api exec prisma migrate status` reports no pending migrations.
-3. `pnpm --filter @commercelab/api exec prisma validate` and `prisma generate` pass.
-4. `pnpm --filter @commercelab/api exec prisma db seed` succeeds twice without duplicate categories/products or resetting inventory.
-5. Confirm constraints in PostgreSQL (`pg_constraint`) and the unique cart index (`pg_indexes`).
-6. Later, service/integration tests must prove concurrent checkout cannot oversell, totals and stock remain consistent on failure, and guest-to-user cart merge is correct.
+## Transaction invariants
 
-## Deferred issues
+1. **Checkout:** within one `Serializable` transaction, read the user's cart, check active variants and TRY currency, conditionally decrement inventory where sufficient stock remains, create `Order`/`OrderItem` snapshots, and clear cart items. On failure, no partial order or stock movement commits.
+2. **Idempotency:** repeat of the same `(userId, idempotencyKey)` and shipping-address payload reuses the existing order. Reuse with a different fingerprint returns `409`; concurrently inserted duplicate keys are handled after the database unique constraint fires.
+3. **Demo payment and cancellation:** permitted state transitions occur in transactions. Failure/cancellation restocks each item; unavailable variant/inventory results in an error requiring manual investigation rather than silent stock corruption.
+4. **Cart:** guest/user operations and merge use serializable transactions with bounded retries. Merge validates the combined item quantities and availability before deleting the guest cart.
 
-- Preventing a category from becoming its own ancestor, including multi-node cycles.
-- Enforcing at least one variant per active product and one inventory row per sellable variant.
-- Deciding whether inventory needs reservations or stock movement audit records.
-- Full-text catalog search, additional filtering indexes, money rounding/tax/shipping policies.
-- Verifying application-level ownership authorization for carts, addresses, and orders.
+The current order status enumeration includes `PENDING`, `CONFIRMED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`; payment status includes `UNPAID`, `PAID_DEMO`, `REFUNDED_DEMO`.
+
+## Applied migration history
+
+The repository snapshot examined for EC-016.2 contains **seven migration folders**, matching the user's previously reported **7 applied / 0 pending** local development state:
+
+| Migration | Purpose |
+| --- | --- |
+| `20261117000000_baseline_schema` | Full initial schema for fresh installs; **existing initialized DBs may need a baseline record rather than replaying table creation** |
+| `20261117135558_init_ecommerce` | Raw SQL integrity constraints and partial user-cart uniqueness index (despite its historical name) |
+| `20261118110000_auth_sessions` | Persisted hashed refresh-token sessions |
+| `20261118170000_cart_integrity` | Ensure one cart owner, positive item quantities and user cart uniqueness |
+| `20261118190000_checkout_idempotency` | `Order` idempotency key, fingerprint and unique user/key index |
+| `20261119150000_restore_missing_checks` | Repair missing integrity constraints in already-provisioned development DBs |
+| `20261119160000_refresh_reuse_tracking` | Previous refresh-hash and rotation timestamp for replay detection |
+
+**Important:** Migration folders are immutable history. The baseline behavior depends on whether a database already contains tables, so do not apply baseline SQL indiscriminately or edit an applied migration. Do not use `prisma migrate reset` on the existing local development database.
+
+## Development database operations
+
+The EC-015 guard script checks the exact Docker Compose project, PostgreSQL role/database, migration history and catalog records. Use it **from the repository root**:
+
+```bash
+node scripts/ec015-4-db.mjs status   # read-only
+node scripts/ec015-4-db.mjs verify   # read-only
+```
+
+On a **new and dedicated** empty development database only, after reviewing pending migrations and taking a backup if needed:
+
+```bash
+node scripts/ec015-4-db.mjs prepare --confirm-dev
+```
+
+Seed upserts three demo catalog products and their variants; its inventory upsert does not overwrite existing stock quantities. It may update demo catalog metadata/prices, so it should never be run against real customer-managed catalog data.
+
+## Test isolation and limits
+
+- Local development uses `commercelab_dev` in the `commerce-lab-dev` Compose project, exposed on host port `5433`.
+- Existing isolated integration suites target **`commercelab_authz_test`** and **`commercelab_checkout_test`**; CI provisions a temporary PostgreSQL 17 service rather than connecting to development data.
+- `CHECK` constraints, raw SQL indexes, transactions and cancellation rollback paths are verified by integration tests; the ER diagram alone does not enforce invariants.
+- Future enhancements might include inventory reservations, stock movement audits, category-cycle protection and hardening active-product variant requirements.
