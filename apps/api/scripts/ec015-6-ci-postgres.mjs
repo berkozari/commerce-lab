@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { stripVTControlCharacters } from 'node:util';
 import pg from 'pg';
 
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -129,7 +130,7 @@ async function prepare() {
   console.log('EC-015.6 CI DATABASE PREPARE PASS');
 }
 function assertPassedExactly(output, count) {
-  const lines = output.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '').split(/\r?\n/);
+  const lines = stripVTControlCharacters(output).split(/\r?\n/);
   const testsLine = lines.find((line) => /^\s*Tests\s+/.test(line));
   const filesLine = lines.find((line) => /^\s*Test Files\s+/.test(line));
   if (!testsLine || !new RegExp(`\\b${count} passed\\b`).test(testsLine) ||

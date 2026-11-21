@@ -85,7 +85,7 @@ function replaceRequired(source, old, next, rel) {
 function patchQualityVerifier(original) {
   return replaceRequired(original,
     `  if (/migrate\\s+(?:reset|deploy)|prisma\\s+db\\s+seed/.test(y))\n    fail('This workflow must not mutate a database (defer to EC-015.6).');`,
-    `  const qualityOnly = y.split(/\\n  postgres-integration:\\s*\\n/)[0];\n  if (/migrate\\s+(?:reset|deploy)|prisma\\s+db\\s+seed/.test(qualityOnly))\n    fail('The original quality job must remain database-independent.');`,
+    `  const qualityOnly = y.split(/\\n {2}postgres-integration:\\s*\\n/)[0];\n  if (/migrate\\s+(?:reset|deploy)|prisma\\s+db\\s+seed/.test(qualityOnly))\n    fail('The original quality job must remain database-independent.');`,
     qualityCheckRel);
 }
 function patchRuntimeVerifier(original) {
@@ -117,7 +117,7 @@ function checkPrerequisites() {
 }
 function patches() {
   const base = checkPrerequisites();
-  const hasJob = /^  postgres-integration:\s*$/m.test(base);
+  const hasJob = /^ {2}postgres-integration:\s*$/m.test(base);
   if (hasJob && !base.includes('node apps/api/scripts/ec015-6-ci-postgres.mjs run'))
     fail('An existing postgres-integration job differs from this EC-015.6 patch; review manually.');
   const workflow = hasJob ? base : base.trimEnd() + '\n' + job;
@@ -127,7 +127,7 @@ function patches() {
 }
 function validate(result) {
   const y = result.get(workflowRel);
-  const j = y.split(/\n  postgres-integration:\s*\n/);
+  const j = y.split(/\n {2}postgres-integration:\s*\n/);
   if (j.length !== 2) fail('There must be exactly one PostgreSQL integration job.');
   for (const item of [
     'image: postgres:17-alpine', "'5433:5432'", 'POSTGRES_USER: commercelab',
