@@ -1,0 +1,45 @@
+name: EC-014 Quality Gates
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+  workflow_dispatch:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      EC014_E2E_LIVE: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter @commercelab/api exec prisma generate
+      - name: Install Playwright Chromium and Linux dependencies
+        run: pnpm --filter @commercelab/web exec playwright install --with-deps chromium
+      - name: Lint, typechecks, builds, coverage gates and browser E2E
+        run: bash scripts/ec014-6-quality-regression.sh --check
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ec014-quality-${{ github.run_id }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            .reports/ec014
+            apps/api/coverage/ec014
+            apps/web/coverage/ec014

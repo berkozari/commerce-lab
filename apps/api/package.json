@@ -8,6 +8,7 @@
         "build": "tsc -p tsconfig.json",
         "start": "node dist/server.js",
         "typecheck": "tsc --noEmit -p tsconfig.json",
+        "typecheck:tests": "prisma generate && tsc --noEmit -p tsconfig.test.json",
         "test": "vitest run",
         "test:watch": "vitest",
         "predev": "prisma generate",
@@ -18,32 +19,33 @@
     "dependencies": {
         "@prisma/adapter-pg": "^7.10.1",
         "@prisma/client": "7.10.0",
+        "argon2": "^0.44.0",
+        "cookie-parser": "^1.4.7",
+        "cors": "^2.8.5",
         "dotenv": "^18.0.10",
         "express": "^5.1.0",
-        "pg": "^8.23.1",
-        "cors": "^2.8.5",
+        "express-rate-limit": "^8.1.0",
         "helmet": "^8.1.0",
+        "jose": "^6.1.0",
+        "pg": "^8.23.1",
         "pino": "^10.0.0",
         "swagger-ui-express": "^5.0.0",
         "yaml": "^2.0.0",
-        "zod": "^4.0.0",
-        "argon2": "^0.44.0",
-        "jose": "^6.1.0",
-        "cookie-parser": "^1.4.7",
-        "express-rate-limit": "^8.1.0"
+        "zod": "^4.0.0"
     },
     "devDependencies": {
+        "@types/cookie-parser": "^1.4.10",
+        "@types/cors": "^2.8.17",
         "@types/express": "^5.0.0",
         "@types/node": "^24.0.0",
         "@types/pg": "^8.23.1",
         "@types/supertest": "^6.0.0",
+        "@types/swagger-ui-express": "^4.1.8",
+        "@vitest/coverage-v8": "4.1.12",
         "prisma": "7.10.0",
         "supertest": "^7.0.0",
         "tsx": "^4.20.0",
         "typescript": "^5.9.0",
-        "@types/cors": "^2.8.17",
-        "@types/swagger-ui-express": "^4.1.8",
-        "vitest": "^4.0.0",
-        "@types/cookie-parser": "^1.4.10"
+        "vitest": "^4.0.0"
     }
 }

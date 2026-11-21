@@ -18,11 +18,8 @@ if [[ "$actual_root" != "$repo_root" ]]; then
   exit 1
 fi
 
+# This gate is read-only and can be run on any branch, including future milestones.
 branch="$(git branch --show-current)"
-if [[ "$branch" != "feature/security-performance" ]]; then
-  echo "ERROR: expected feature/security-performance, found '$branch'." >&2
-  exit 1
-fi
 
 if [[ ! -f apps/api/package.json || ! -f apps/web/package.json || ! -f eslint.config.mjs ]]; then
   echo "ERROR: expected CommerceLab workspace files not found." >&2

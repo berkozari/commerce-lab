@@ -11,3 +11,8 @@ coverage/
 *.log
 *.zip
 /apps/api/src/generated/prisma/
+apps/api/coverage/
+
+apps/web/coverage/
+
+.reports/

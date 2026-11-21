@@ -26,14 +26,26 @@ export const variantCreateSchema = z.strictObject({
     currency: z.literal("TRY").default("TRY"), attributes: attributes.default({}),
     isActive: z.boolean().default(true), quantity: nonnegativeInt.default(0),
 });
-export const variantUpdateSchema = variantCreateSchema.omit({ quantity: true }).partial()
+// Update schemas must not inject creation defaults into omitted fields (Zod 4).
+export const variantUpdateSchema = variantCreateSchema
+    .omit({ quantity: true, currency: true, attributes: true, isActive: true })
+    .partial()
+    .extend({
+        currency: z.literal("TRY").optional(),
+        attributes: attributes.optional(),
+        isActive: z.boolean().optional(),
+    })
     .refine((v) => Object.keys(v).length > 0, "No changes supplied");
 
 export const imageCreateSchema = z.strictObject({
     url: z.url().max(2048).refine((v) => v.startsWith("https://") || v.startsWith("http://"), "HTTP(S) URL required"),
     altText: z.string().trim().max(250).nullable().optional(), position: nonnegativeInt.default(0),
 });
-export const imageUpdateSchema = imageCreateSchema.partial().refine((v) => Object.keys(v).length > 0, "No changes supplied");
+export const imageUpdateSchema = imageCreateSchema
+    .omit({ position: true })
+    .partial()
+    .extend({ position: nonnegativeInt.optional() })
+    .refine((v) => Object.keys(v).length > 0, "No changes supplied");
 export const stockUpdateSchema = z.strictObject({ quantity: nonnegativeInt });
 
 export const listProductsQuerySchema = z.strictObject({
