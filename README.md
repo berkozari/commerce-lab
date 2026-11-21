@@ -4,7 +4,6 @@
 
 CommerceLab is a **portfolio / learning project**, not a deployed commercial store. Payments are simulated; **do not enter real card details**. The repository focuses on a realistic customer journey, a maintainable architecture, database consistency, security controls, and automated quality checks.
 
-<!-- EC-016.3 SHOWCASE START -->
 ## Storefront showcase
 
 Screenshots of the **real React interface**, captured using Playwright with **synthetic mock API data**. No real payments, accounts, or production data are used. [View the complete walkthrough](docs/showcase.md).
@@ -15,7 +14,6 @@ Screenshots of the **real React interface**, captured using Playwright with **sy
 | **Shopping cart** | **Demo order confirmation** |
 | ![CommerceLab cart](docs/assets/screenshots/04-cart-desktop.png) | ![CommerceLab demo order](docs/assets/screenshots/06-order-confirmation-desktop.png) |
 
-<!-- EC-016.3 SHOWCASE END -->
 
 ## Features
 
