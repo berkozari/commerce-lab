@@ -33,10 +33,10 @@ function assertCanonical() {
     'permissions:', 'contents: read', 'concurrency:',
     'pull_request:', "'feature/**'", 'workflow_dispatch:',
     'pnpm install --frozen-lockfile',
-    'actions/checkout@v4', 'pnpm/action-setup@v4', 'actions/setup-node@v4',
+    'actions/checkout@v6', 'pnpm/action-setup@v6', 'actions/setup-node@v6',
     'playwright install --with-deps chromium',
     'bash scripts/ec014-6-quality-regression.sh --check',
-    'EC014_E2E_LIVE:', 'actions/upload-artifact@v4',
+    'EC014_E2E_LIVE:', 'actions/upload-artifact@v6',
   ]) if (!y.includes(required)) fail(`CI workflow missing expected entry: ${required}`);
   if (!/^\s*EC014_E2E_LIVE:\s*['"]0['"]\s*$/m.test(y))
     fail('CI must keep real database E2E disabled (EC014_E2E_LIVE=0).');
