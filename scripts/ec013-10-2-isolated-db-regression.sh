@@ -118,7 +118,10 @@ main() {
   cd "$repo_root"
   [[ -f apps/api/package.json && -f apps/api/.env ]] || { fail 'Not a CommerceLab checkout or missing apps/api/.env'; return 1; }
   [[ "$(git rev-parse --show-toplevel)" == "$repo_root" ]] || { fail 'Script must be under repo-root/scripts'; return 1; }
-  [[ "$(git branch --show-current)" == 'feature/security-performance' ]] || { fail 'Wrong Git branch'; return 1; }
+  # These tests write only to isolated test databases; never run them from main/master.
+  local branch
+  branch="$(git branch --show-current)"
+  [[ "$branch" == feature/* ]] || { fail "Run isolated DB regression on a feature/* branch, not '$branch'"; return 1; }
   command -v docker >/dev/null || { fail 'Docker is required'; return 1; }
   command -v pnpm >/dev/null || { fail 'pnpm is required'; return 1; }
   command -v node >/dev/null || { fail 'Node.js is required'; return 1; }
@@ -137,15 +140,19 @@ main() {
   verify_target 'commercelab_authz_test' "$authz_url" || return 1
   verify_target 'commercelab_checkout_test' "$checkout_url" || return 1
 
-  run_integration 'Authorization/ownership' 'tests/authorization-ownership.integration.test.ts' 10 "$authz_url" EC013_AUTHZ_TEST_DATABASE_URL || return 1
-  run_integration 'Checkout atomicity' 'tests/checkout-transaction.integration.test.ts' 7 "$checkout_url" EC013_CHECKOUT_TEST_DATABASE_URL || return 1
-  run_integration 'Payment and cancellation' 'tests/order-payment-cancellation.integration.test.ts' 11 "$checkout_url" EC013_CHECKOUT_TEST_DATABASE_URL || return 1
+  run_integration 'Authorization/ownership' 'tests/integration/authorization-ownership.integration.test.ts' 10 "$authz_url" EC013_AUTHZ_TEST_DATABASE_URL || return 1
+  run_integration 'Checkout atomicity' 'tests/integration/checkout-transaction.integration.test.ts' 7 "$checkout_url" EC013_CHECKOUT_TEST_DATABASE_URL || return 1
+  run_integration 'Payment and cancellation' 'tests/integration/order-payment-cancellation.integration.test.ts' 11 "$checkout_url" EC013_CHECKOUT_TEST_DATABASE_URL || return 1
+  run_integration 'Cart merge and rollback' 'tests/integration/cart-merge.integration.test.ts' 5 "$checkout_url" EC013_CHECKOUT_TEST_DATABASE_URL || return 1
+  run_integration 'Catalog prices and visibility' 'tests/integration/catalog-pricing.integration.test.ts' 9 "$checkout_url" EC013_CHECKOUT_TEST_DATABASE_URL || return 1
 
   printf '\n=== EC-013.10.2 SUMMARY ===\n'
   printf 'PASS | Authorization & ownership | 10 passed\n'
   printf 'PASS | Checkout atomicity | 7 passed\n'
   printf 'PASS | Payment & cancellation | 11 passed\n'
-  printf 'EC-013.10.2 PASS — 28 passed, 0 skipped, 0 failed.\n'
+  printf 'PASS | Cart merge and rollback | 5 passed\n'
+  printf 'PASS | Catalog prices and visibility | 9 passed\n'
+  printf 'EC-013.10.2 + EC-014.3.3 + EC-014.3.5 PASS — 42 passed, 0 skipped, 0 failed.\n'
   printf 'Completed: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')"
 }
 
