@@ -53,6 +53,12 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter @commercelab/web exec playwright install --with-deps chromium
 
+      - name: Validate EC-015.8 final CI contract
+        run: node scripts/ec015-8-final.mjs verify
+
+      - name: Validate EC-015.7 infrastructure health contract
+        run: node scripts/ec015-7-infrastructure.mjs verify
+
       - name: Lint, typechecks, build, coverage gate and mocked-browser E2E
         run: bash scripts/ec014-6-quality-regression.sh --check
 
