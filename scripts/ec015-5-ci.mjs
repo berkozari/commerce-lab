@@ -40,8 +40,9 @@ function assertCanonical() {
   ]) if (!y.includes(required)) fail(`CI workflow missing expected entry: ${required}`);
   if (!/^\s*EC014_E2E_LIVE:\s*['"]0['"]\s*$/m.test(y))
     fail('CI must keep real database E2E disabled (EC014_E2E_LIVE=0).');
-  if (/migrate\s+(?:reset|deploy)|prisma\s+db\s+seed/.test(y))
-    fail('This workflow must not mutate a database (defer to EC-015.6).');
+  const qualityOnly = y.split(/\n  postgres-integration:\s*\n/)[0];
+  if (/migrate\s+(?:reset|deploy)|prisma\s+db\s+seed/.test(qualityOnly))
+    fail('The original quality job must remain database-independent.');
 }
 function assertLegacySafe() {
   const y = read(legacy);

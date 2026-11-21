@@ -1,0 +1,35 @@
+# CommerceLab development image: only project sources and dependency manifests.
+.git
+**/.git
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+coverage
+**/coverage
+.reports
+**/.reports
+playwright-report
+**/playwright-report
+test-results
+**/test-results
+.next
+**/.next
+.turbo
+**/.turbo
+.cache
+**/.cache
+.DS_Store
+**/.DS_Store
+*.log
+*.zip
+# Never send local credentials or generated secrets into Docker build context.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+# Prisma Client is generated inside the image / container.
+apps/api/src/generated/prisma

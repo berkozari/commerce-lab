@@ -34,11 +34,11 @@ for (const rel of files) {
   for (const action of actions) {
     const re = new RegExp(`${action.replaceAll('/', '\\/')}@v(\\d+)`, 'g');
     const found = [...updated.matchAll(re)];
-    if (found.length !== 1)
-      fail(`Expected exactly one ${action} reference in ${rel}; found ${found.length}. No files changed.`);
-    const version = Number(found[0][1]);
-    if (![4, 6].includes(version))
-      fail(`Unexpected ${action}@v${version} in ${rel}; inspect manually. No files changed.`);
+    if (found.length < 1)
+      fail(`Expected at least one ${action} reference in ${rel}; found 0. No files changed.`);
+    const unsupported = found.find(match => ![4, 6].includes(Number(match[1])));
+    if (unsupported)
+      fail(`Unexpected ${action}@v${unsupported[1]} in ${rel}; inspect manually. No files changed.`);
     updated = updated.replace(re, `${action}@v6`);
   }
   changes.push({ rel, full, original, updated: updated + retained });
