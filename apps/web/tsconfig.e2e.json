@@ -9,7 +9,9 @@
   "include": [
     "e2e/**/*.ts",
     "playwright.config.ts",
-    "vite.config.e2e.ts"
+    "vite.config.e2e.ts",
+    "playwright.showcase.config.ts",
+    "vite.config.showcase.ts"
   ],
   "exclude": [
     "node_modules",
