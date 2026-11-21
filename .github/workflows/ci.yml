@@ -1,0 +1,134 @@
+name: CommerceLab CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+  workflow_dispatch:
+
+# PRs and feature branches should not have write access to the repository.
+permissions:
+  contents: read
+
+# Stop an older run on the same PR/ref when new commits are pushed.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint / Types / Build / Coverage / Browser E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      # CI here does NOT connect to a real database. EC-015.6 will add a
+      # deliberately isolated PostgreSQL job, with its own checks.
+      EC014_E2E_LIVE: '0'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @commercelab/api exec prisma generate
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @commercelab/web exec playwright install --with-deps chromium
+
+      - name: Validate EC-015.8 final CI contract
+        run: node scripts/ec015-8-final.mjs verify
+
+      - name: Validate EC-015.7 infrastructure health contract
+        run: node scripts/ec015-7-infrastructure.mjs verify
+
+      - name: Lint, typechecks, build, coverage gate and mocked-browser E2E
+        run: bash scripts/ec014-6-quality-regression.sh --check
+
+      - name: Upload diagnostic reports (including failed runs)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: commercelab-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            .reports/ec014
+            apps/api/coverage/ec014
+            apps/web/coverage/ec014
+
+  postgres-integration:
+    name: PostgreSQL Integration (42 real DB tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Separate, disposable service. Never connects to the local Docker volume.
+    env:
+      CI: 'true'
+      EC0156_POSTGRES_PASSWORD: 'commerce-ci-ephemeral-only-0156'
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: commercelab
+          POSTGRES_PASSWORD: 'commerce-ci-ephemeral-only-0156'
+          POSTGRES_DB: postgres
+        ports:
+          - '5433:5432'
+        options: >-
+          --health-cmd "pg_isready -U commercelab -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @commercelab/api exec prisma generate
+
+      - name: Create and migrate disposable CI test databases
+        run: node apps/api/scripts/ec015-6-ci-postgres.mjs prepare
+
+      - name: Execute 42 PostgreSQL integration tests (no skips)
+        run: node apps/api/scripts/ec015-6-ci-postgres.mjs run
+
+      - name: Upload PostgreSQL integration reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ec0156-postgres-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: .reports/ec015-6
